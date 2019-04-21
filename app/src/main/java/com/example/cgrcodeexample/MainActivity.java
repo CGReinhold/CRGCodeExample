@@ -17,13 +17,16 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
+import java.util.List;
 
 // OpenCV Classes
 
@@ -41,11 +44,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     // These variables are used (at the moment) to fix camera orientation from 270degree to 0degree
     Mat mRgba;
-    Mat mRgbaF;
-    Mat mRgbaT;
     Mat mGray;
-    Mat mGrayF;
-    Mat mGrayT;
+    Mat mFinal;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -83,6 +83,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
 
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+        mOpenCvCameraView.setMaxFrameSize(1000, 800);
     }
 
     @Override
@@ -114,11 +116,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     public void onCameraViewStarted(int width, int height) {
         mRgba = new Mat(height, width, CvType.CV_8UC4);
-        mRgbaF = new Mat(height, width, CvType.CV_8UC4);
-        mRgbaT = new Mat(height, width, CvType.CV_8UC4);
         mGray = new Mat(height, width, CvType.CV_8UC4);
-        mGrayF = new Mat(height, width, CvType.CV_8UC4);
-        mGrayT = new Mat(height, width, CvType.CV_8UC4);
     }
 
     public void onCameraViewStopped() {
@@ -128,25 +126,81 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
         mRgba = inputFrame.rgba();
         mGray = inputFrame.gray();
-        Core.transpose(mRgba, mRgbaT);
-        Imgproc.resize(mRgbaT, mRgbaF, mRgbaF.size(), 0,0, 0);
-        Core.flip(mRgbaF, mRgba, 1 );
-        // Rotate mGray 90 degrees
-        Core.transpose(mGray, mGrayT);
-        Imgproc.resize(mGrayT, mGrayF, mGrayF.size(), 0,0, 0);
-        Core.flip(mGrayF, mGray, 1 );
+
+        Rect boundBox = Imgproc.boundingRect(mGray);
+        int centerImageX = (boundBox.width + boundBox.x) / 2;
+        int centerImageY = (boundBox.height + boundBox.y) / 2;
+
         Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
         Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
-//        Imgproc.erode(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_ERODE, new Size(11, 11)));
+        Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(11, 11)), new Point(-1, -1), 5);
+        Imgproc.morphologyEx(mGray, mGray, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25)));
+
         ArrayList<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchy = new Mat();
         Imgproc.findContours(mGray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-
+        ArrayList<MatOfInt> hulls = new ArrayList<>();
+        List<MatOfPoint> hullPoints = new ArrayList<>();
         for(int idx = 0; idx >= 0; idx = (int) hierarchy.get(0, idx)[0]) {
-            MatOfPoint matOfPoint = contours.get(idx);
-            Rect rect = Imgproc.boundingRect(matOfPoint);
-            Imgproc.rectangle(mRgba, rect.tl(), rect.br(), new Scalar(0, 0, 255));
+            MatOfInt hull = new MatOfInt();
+            Imgproc.convexHull(contours.get(idx), hull);
+            hulls.add(hull);
+            Rect boundBoxContour = Imgproc.boundingRect(contours.get(idx));
+            int centerX = (boundBoxContour.width + boundBoxContour.x) / 2;
+            int centerY = (boundBoxContour.height + boundBoxContour.y) / 2;
+
+            if (idx != 0 && centerX > centerImageX - 220 && centerX < centerImageX + 220 &&
+                    centerY > centerImageY - 120 && centerY < centerImageY + 120) {
+                hullPoints.add(hull2Points(hull, contours.get(idx)));
+            }
         }
+
+//        mFinal = Mat.zeros(mGray.size(), 0);
+        if (hullPoints != null) {
+//            Imgproc.drawContours(mGray, hullPoints, -1, new Scalar(255, 255, 255));
+//            Imgproc.drawContours(mFinal, hullPoints, -1, new Scalar(255, 255, 255), -1);
+            Imgproc.drawContours(mRgba, hullPoints, -1, new Scalar(255, 0, 0), -1);
+        }
+
+//        return mGray;
+//        return mFinal;
         return mRgba;
     }
+
+    MatOfPoint hull2Points(MatOfInt hull, MatOfPoint contour) {
+        List<Integer> indexes = hull.toList();
+        List<Point> points = new ArrayList<>();
+        MatOfPoint point= new MatOfPoint();
+        for(Integer index:indexes) {
+            points.add(contour.toList().get(index));
+        }
+        point.fromList(points);
+        return point;
+    }
+
+//    public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+//        mRgba = inputFrame.rgba();
+//        mGray = inputFrame.gray();
+//        mFinal = inputFrame.gray();
+//        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
+//        Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+//        Imgproc.threshold(mFinal, mFinal, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+//        Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5)), new Point(-1, -1), 5);
+//        Imgproc.morphologyEx(mGray, mGray, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25)));
+////        Imgproc.erode(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5)), new Point(-1, -1), 5);
+//
+////        ArrayList<MatOfPoint> contours = new ArrayList<>();
+////        Mat hierarchy = new Mat();
+////        Imgproc.findContours(mGray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+////        if (contours != null) {
+////            Imgproc.drawContours(mFinal, contours, -1, new Scalar(255, 255, 255), -1);
+////        }
+//
+////        for(int idx = 0; idx >= 0; idx = (int) hierarchy.get(0, idx)[0]) {
+////            MatOfPoint matOfPoint = contours.get(idx);
+////            Rect rect = Imgproc.boundingRect(matOfPoint);
+////            Imgproc.rectangle(mRgba, rect.tl(), rect.br(), new Scalar(0, 0, 255));
+////        }
+//        return mGray;
+//    }
 }
