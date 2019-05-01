@@ -3,7 +3,6 @@ package com.example.cgrcodeexample;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.SurfaceView;
 import android.view.WindowManager;
 
@@ -14,7 +13,6 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfInt;
@@ -38,14 +36,11 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     // Loads camera view of OpenCV for us to use. This lets us see using OpenCV
     private CameraBridgeViewBase mOpenCvCameraView;
 
-    // Used in Camera selection from menu (when implemented)
-    private boolean mIsJavaCamera = true;
-    private MenuItem mItemSwitchCamera = null;
-
     // These variables are used (at the moment) to fix camera orientation from 270degree to 0degree
     Mat mRgba;
     Mat mGray;
-    Mat mFinal;
+    Mat mOuterShape;
+    Mat mInnerShape;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -131,8 +126,15 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         int centerImageX = (boundBox.width + boundBox.x) / 2;
         int centerImageY = (boundBox.height + boundBox.y) / 2;
 
+        //Drawing the part that the code will validate
+        Imgproc.rectangle(mRgba, new Point(centerImageX - 220, centerImageY - 220), new Point(centerImageX + 220, centerImageY + 220), new Scalar(0, 0, 0), 3);
+
+        ArrayList<MatOfPoint> allContours = new ArrayList<>();
+        Mat allHierarchy = new Mat();
+
         Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
         Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+        Imgproc.findContours(mGray, allContours, allHierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
         Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(11, 11)), new Point(-1, -1), 5);
         Imgproc.morphologyEx(mGray, mGray, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25)));
 
@@ -155,15 +157,39 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             }
         }
 
-//        mFinal = Mat.zeros(mGray.size(), 0);
+        //Drawing the outer contour
+        mOuterShape = Mat.zeros(mGray.size(), 0);
+        mInnerShape = Mat.zeros(mGray.size(), 0);
         if (hullPoints != null) {
-//            Imgproc.drawContours(mGray, hullPoints, -1, new Scalar(255, 255, 255));
-//            Imgproc.drawContours(mFinal, hullPoints, -1, new Scalar(255, 255, 255), -1);
-            Imgproc.drawContours(mRgba, hullPoints, -1, new Scalar(255, 0, 0), -1);
+            Imgproc.drawContours(mOuterShape, hullPoints, -1, new Scalar(255, 255, 255), -1);
+            Imgproc.drawContours(mInnerShape, hullPoints, -1, new Scalar(255, 255, 255), -1);
+            Imgproc.erode(mInnerShape, mInnerShape, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(23, 23)), new Point(-1, -1), 5);
         }
 
-//        return mGray;
-//        return mFinal;
+
+
+        //Drawing the inner contours
+        if (allContours != null) {
+            ArrayList<MatOfPoint> newAllContours = new ArrayList<>();
+            //Get list of contours to filter only those that are inside the outerShape and outside the innerShape
+            for (MatOfPoint contour : allContours) {
+                Point center = getCenterContour(contour);
+                if (mOuterShape != null && mInnerShape != null) {
+                    double[] pixelOuter = mOuterShape.get((int) center.y, (int) center.x);
+                    double[] pixelInner = mInnerShape.get((int) center.y, (int) center.x);
+                    if (pixelOuter != null && pixelInner != null) {
+                        if (pixelOuter.length > 0 && pixelOuter[0] == 255 && pixelInner.length > 0 && pixelInner[0] == 0) {
+                            newAllContours.add(contour);
+                        }
+                    }
+                }
+            }
+
+            if (newAllContours != null) {
+                Imgproc.drawContours(mRgba, newAllContours, -1, new Scalar(255, 0, 0), -1);
+            }
+        }
+
         return mRgba;
     }
 
@@ -178,29 +204,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return point;
     }
 
-//    public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-//        mRgba = inputFrame.rgba();
-//        mGray = inputFrame.gray();
-//        mFinal = inputFrame.gray();
-//        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
-//        Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
-//        Imgproc.threshold(mFinal, mFinal, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
-//        Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5)), new Point(-1, -1), 5);
-//        Imgproc.morphologyEx(mGray, mGray, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25)));
-////        Imgproc.erode(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5)), new Point(-1, -1), 5);
-//
-////        ArrayList<MatOfPoint> contours = new ArrayList<>();
-////        Mat hierarchy = new Mat();
-////        Imgproc.findContours(mGray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-////        if (contours != null) {
-////            Imgproc.drawContours(mFinal, contours, -1, new Scalar(255, 255, 255), -1);
-////        }
-//
-////        for(int idx = 0; idx >= 0; idx = (int) hierarchy.get(0, idx)[0]) {
-////            MatOfPoint matOfPoint = contours.get(idx);
-////            Rect rect = Imgproc.boundingRect(matOfPoint);
-////            Imgproc.rectangle(mRgba, rect.tl(), rect.br(), new Scalar(0, 0, 255));
-////        }
-//        return mGray;
-//    }
+    public Point getCenterContour(MatOfPoint contour)
+    {
+        Rect bound = Imgproc.boundingRect(contour);
+        return new Point(bound.x + bound.width / 2, bound.y + bound.height / 2);
+    }
 }
