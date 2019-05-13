@@ -254,7 +254,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                 }
             }
 
-            decodeText(pointsAndValues);
+            String text = decodeText(pointsAndValues);
+            Imgproc.putText(mRgba, text, new Point(20, 20), 3, 1, new Scalar(0, 0, 0, 255), 2);
         }
 
         return mRgba;
@@ -282,8 +283,41 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     }
 
     private String decodeText(ArrayList<PointValue> points) {
-        Log.println(Log.INFO, "", points.toString());
-        return "";
+        Point pontoAtual = null;
+        for (int i = 0; i < points.size(); i++) {
+            if (points.get(i).value == "4") {
+                pontoAtual = points.get(i).point;
+                points.remove(i);
+                break;
+            }
+        }
+
+        String retorno = "4";
+
+        while (points.size() > 0) {
+            int indexClosest = getIndexClosestPoint(pontoAtual, points);
+            PointValue closestPoint = points.get(indexClosest);
+            pontoAtual = closestPoint.point;
+            retorno += closestPoint.value;
+            points.remove(indexClosest);
+        }
+
+        return retorno;
+    }
+
+    private int getIndexClosestPoint(Point point, ArrayList<PointValue> listPoints) {
+        double distanceClosestPoint = 9999999;
+        int indexClosestPoint = -1;
+
+        for (int i = 0; i < listPoints.size(); i++) {
+            double distance = Math.sqrt(Math.pow(point.x - listPoints.get(i).point.x, 2) + Math.pow(point.y - listPoints.get(i).point.y, 2));
+            if (distance < distanceClosestPoint) {
+                distanceClosestPoint = distance;
+                indexClosestPoint = i;
+            }
+        }
+
+        return indexClosestPoint;
     }
 
     private class PointValue
