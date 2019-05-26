@@ -132,6 +132,20 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         int centerImageX = (boundBox.width + boundBox.x) / 2;
         int centerImageY = (boundBox.height + boundBox.y) / 2;
 
+        int quarter = boundBox.width / 4;
+
+        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
+        Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+
+        Mat mask = new Mat(mGray.rows(), mGray.cols(), mGray.type(), Scalar.all(0));
+        Imgproc.rectangle(mask, new Rect(centerImageX - quarter, centerImageY - quarter, quarter * 2, quarter * 2), new Scalar(255, 255, 255), -1);
+
+
+        Mat cropped = new Mat();
+        mGray.copyTo(cropped, mask);
+        mGray = cropped;
+        Core.bitwise_not(mGray, mGray);
+
         //Drawing the part that the code will validate
         Imgproc.rectangle(mRgba, new Point(centerImageX - 220, centerImageY - 220), new Point(centerImageX + 220, centerImageY + 220), new Scalar(0, 0, 0), 3);
 
@@ -148,30 +162,14 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         Mat hierarchy = new Mat();
         Imgproc.findContours(mGray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
-        List<MatOfPoint> hullPoints = new ArrayList<>();
-        for(int idx = 0; idx >= 0; idx = (int) hierarchy.get(0, idx)[0]) {
-            MatOfInt hull = new MatOfInt();
-            Imgproc.convexHull(contours.get(idx), hull);
-
-            Rect boundBoxContour = Imgproc.boundingRect(contours.get(idx));
-            int centerX = (boundBoxContour.width + boundBoxContour.x) / 2;
-            int centerY = (boundBoxContour.height + boundBoxContour.y) / 2;
-
-            if (idx != 0 && centerX > centerImageX - 220 && centerX < centerImageX + 220 &&
-                    centerY > centerImageY - 120 && centerY < centerImageY + 120) {
-                hullPoints.add(hull2Points(hull, contours.get(idx)));
-            }
-        }
-
         //Drawing the outer contour
         mOuterShape = Mat.zeros(mGray.size(), 0);
         mInnerShape = Mat.zeros(mGray.size(), 0);
         mClean = Mat.zeros(mGray.size(), 0);
-        if (hullPoints.size() > 0) {
-            Imgproc.drawContours(mOuterShape, hullPoints, -1, new Scalar(255, 255, 255), -1);
-            Imgproc.drawContours(mInnerShape, hullPoints, -1, new Scalar(255, 255, 255), -1);
-            Imgproc.erode(mInnerShape, mInnerShape, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(23, 23)), new Point(-1, -1), 5);
-        }
+
+        Imgproc.drawContours(mOuterShape, contours, -1, new Scalar(255, 255, 255), -1);
+        Imgproc.drawContours(mInnerShape, contours, -1, new Scalar(255, 255, 255), -1);
+        Imgproc.erode(mInnerShape, mInnerShape, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(17, 17)), new Point(-1, -1), 5);
 
         //Drawing the inner contours
         if (allContours.size() > 0) {
@@ -182,12 +180,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             //Get list of contours to filter only those that are inside the outerShape and outside the innerShape
             for (MatOfPoint contour : allContours) {
                 Point center = getCenterContour(contour);
+
                 if (mOuterShape != null && mInnerShape != null) {
                     double[] pixelOuter = mOuterShape.get((int) center.y, (int) center.x);
                     double[] pixelInner = mInnerShape.get((int) center.y, (int) center.x);
                     if (pixelOuter != null && pixelInner != null) {
                         if (pixelOuter.length > 0 && pixelOuter[0] == 255 && pixelInner.length > 0 && pixelInner[0] == 0) {
-                            if (allHierarchy.get(0, i)[0] == -1) {
+                            if (allHierarchy.get(0, i)[3] != -1) {
                                 paisVazados.add((int)allHierarchy.get(0, i)[3]);
                             } else {
                                 newAllContours.add(contour);
@@ -200,7 +199,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             }
 
             if (newAllContours.size() > 0) {
-                Imgproc.drawContours(mRgba, newAllContours, -1, new Scalar(255, 0, 0), -1);
+                Imgproc.drawContours(mRgba, newAllContours, -1, new Scalar(0, 255, 0), -1);
                 Imgproc.drawContours(mClean, newAllContours, -1, new Scalar(255, 255, 255), -1);
             }
 
@@ -240,15 +239,15 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                         pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "4"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 0, 255), 3);
                     } else if (rect.width > rect.height * 1.5 || rect.height > rect.width * 1.5) {
-                        Imgproc.putText(mRgba, "0", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+//                        Imgproc.putText(mRgba, "0", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
                         pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "0"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 0, 255, 255), 3);
                     } else if (paisVazados.contains(contourIdx)) {
-                        Imgproc.putText(mRgba, "1", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+//                        Imgproc.putText(mRgba, "1", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
                         pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "1"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 255, 255), 3);
                     } else if (!paisVazados.contains(contourIdx)) {
-                        Imgproc.putText(mRgba, "2", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+//                        Imgproc.putText(mRgba, "2", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
                         pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "2"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 0, 0, 255), 3);
                     }
@@ -257,10 +256,14 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
             if (pointsAndValues.size() > 0) {
                 String text = decodeText(pointsAndValues);
-                textoDecode = convertFromBase3(text);
+                String novoTexto = convertFromBase3(text);
+                if (novoTexto.matches("[a-zA-Z0-9]+")) {
+                    textoDecode = novoTexto;
+                }
             }
 
-            Imgproc.putText(mRgba, textoDecode, new Point(20, 20), 3, 1, new Scalar(0, 0, 0, 255), 2);
+
+            Imgproc.putText(mRgba, textoDecode, new Point(20, 100), 3, 3, new Scalar(0, 0, 255, 255), 2);
         }
 
         return mRgba;
@@ -294,7 +297,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                 String texto = text.substring(0, 6);
                 Log.println(Log.INFO, "", "texto: " + texto);
                 text = text.substring(6);
-                textoFinal += Character.toString((char)Integer.parseInt(texto, 3));
+                if (!texto.contains("4")) {
+                    textoFinal += Character.toString((char) Integer.parseInt(texto, 3));
+                }
             } else {
                 break;
             }
