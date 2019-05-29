@@ -47,7 +47,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     Mat mOuterShape;
     Mat mInnerShape;
     Mat mClean;
-    Mat mCross;
     String textoDecode = "";
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -112,12 +111,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     public void onCameraViewStarted(int width, int height) {
         mRgba = new Mat(height, width, CvType.CV_8UC4);
         mGray = new Mat(height, width, CvType.CV_8UC4);
-        try {
-            mCross = Utils.loadResource(this, R.drawable.hu, CvType.CV_8UC4);
-        }
-        catch (IOException ex) {
-            mCross = null;
-        }
     }
 
     public void onCameraViewStopped() {
@@ -176,6 +169,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             ArrayList<MatOfPoint> newAllContours = new ArrayList<>();
             ArrayList<Integer> newAllContoursPoints = new ArrayList<>();
             ArrayList<Integer> paisVazados = new ArrayList<>();
+            ArrayList<Integer> filhosVazados = new ArrayList<>();
+            int pontoInicial = -1;
             int i = 0;
             //Get list of contours to filter only those that are inside the outerShape and outside the innerShape
             for (MatOfPoint contour : allContours) {
@@ -187,7 +182,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                     if (pixelOuter != null && pixelInner != null) {
                         if (pixelOuter.length > 0 && pixelOuter[0] == 255 && pixelInner.length > 0 && pixelInner[0] == 0) {
                             if (allHierarchy.get(0, i)[3] != -1) {
-                                paisVazados.add((int)allHierarchy.get(0, i)[3]);
+                                int pai = (int)allHierarchy.get(0, i)[3];
+                                if (filhosVazados.contains(pai)) {
+                                    pontoInicial = (int)allHierarchy.get(0, pai)[3];
+                                } else {
+                                    paisVazados.add(pai);
+                                    filhosVazados.add(i);
+                                }
                             } else {
                                 newAllContours.add(contour);
                                 newAllContoursPoints.add(i);
@@ -201,19 +202,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             if (newAllContours.size() > 0) {
                 Imgproc.drawContours(mRgba, newAllContours, -1, new Scalar(0, 255, 0), -1);
                 Imgproc.drawContours(mClean, newAllContours, -1, new Scalar(255, 255, 255), -1);
-            }
-
-            int matchCenterX = 0;
-            int matchCenterY = 0;
-            if (mCross != null && newAllContoursPoints.size() > 25) {
-                Mat resultCross = Mat.zeros(mGray.size(), 0);
-                Imgproc.cvtColor(mClean, mClean, CvType.CV_8U);
-                Imgproc.cvtColor(mCross, mCross, CvType.CV_8U);
-                Imgproc.matchTemplate(mClean, mCross, resultCross, Imgproc.TM_CCOEFF);
-                Core.MinMaxLocResult mmr = Core.minMaxLoc(resultCross);
-                Point matchLoc = mmr.maxLoc;
-                matchCenterX = (int)(matchLoc.x + (mCross.cols() / 2));
-                matchCenterY = (int)(matchLoc.y + (mCross.rows() / 2));
             }
 
             ArrayList<PointValue> pointsAndValues = new ArrayList<>();
@@ -234,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                     // Get bounding rect of contour
                     Rect rect = Imgproc.boundingRect(points);
 
-                    if (isPointInsideRectangle(new Point(matchCenterX, matchCenterY), rect)) {
+                    if (contourIdx == pontoInicial) {
                         Imgproc.putText(mRgba, "4", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
                         pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "4"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 0, 255), 3);
@@ -262,26 +250,10 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                 }
             }
 
-
             Imgproc.putText(mRgba, textoDecode, new Point(20, 100), 3, 3, new Scalar(0, 0, 255, 255), 2);
         }
 
         return mRgba;
-    }
-
-    public boolean isPointInsideRectangle(Point p, Rect r) {
-        return (p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height);
-    }
-
-    private MatOfPoint hull2Points(MatOfInt hull, MatOfPoint contour) {
-        List<Integer> indexes = hull.toList();
-        List<Point> points = new ArrayList<>();
-        MatOfPoint point= new MatOfPoint();
-        for(Integer index:indexes) {
-            points.add(contour.toList().get(index));
-        }
-        point.fromList(points);
-        return point;
     }
 
     private Point getCenterContour(MatOfPoint contour)
