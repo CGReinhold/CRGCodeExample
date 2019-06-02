@@ -133,7 +133,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         Mat mask = new Mat(mGray.rows(), mGray.cols(), mGray.type(), Scalar.all(0));
         Imgproc.rectangle(mask, new Rect(centerImageX - quarter, centerImageY - quarter, quarter * 2, quarter * 2), new Scalar(255, 255, 255), -1);
 
-
         Mat cropped = new Mat();
         mGray.copyTo(cropped, mask);
         mGray = cropped;
@@ -204,49 +203,50 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                 Imgproc.drawContours(mClean, newAllContours, -1, new Scalar(255, 255, 255), -1);
             }
 
-            ArrayList<PointValue> pointsAndValues = new ArrayList<>();
+            if (pontoInicial != -1 && newAllContours.size() > 28) {
+                ArrayList<PointValue> pointsAndValues = new ArrayList<>();
 
-            for (int contourIdx = 0; contourIdx < allContours.size(); contourIdx++)
-            {
-                if (newAllContoursPoints.contains(contourIdx)) {
-                    // Minimum size allowed for consideration
-                    MatOfPoint2f approxCurve = new MatOfPoint2f();
-                    MatOfPoint2f contour2f = new MatOfPoint2f(allContours.get(contourIdx).toArray());
-                    //Processing on mMOP2f1 which is in type MatOfPoint2f
-                    double approxDistance = Imgproc.arcLength(contour2f, true) * 0.02;
-                    Imgproc.approxPolyDP(contour2f, approxCurve, approxDistance, true);
+                for (int contourIdx = 0; contourIdx < allContours.size(); contourIdx++) {
+                    if (newAllContoursPoints.contains(contourIdx)) {
+                        // Minimum size allowed for consideration
+                        MatOfPoint2f approxCurve = new MatOfPoint2f();
+                        MatOfPoint2f contour2f = new MatOfPoint2f(allContours.get(contourIdx).toArray());
+                        //Processing on mMOP2f1 which is in type MatOfPoint2f
+                        double approxDistance = Imgproc.arcLength(contour2f, true) * 0.02;
+                        Imgproc.approxPolyDP(contour2f, approxCurve, approxDistance, true);
 
-                    //Convert back to MatOfPoint
-                    MatOfPoint points = new MatOfPoint(approxCurve.toArray());
+                        //Convert back to MatOfPoint
+                        MatOfPoint points = new MatOfPoint(approxCurve.toArray());
 
-                    // Get bounding rect of contour
-                    Rect rect = Imgproc.boundingRect(points);
+                        // Get bounding rect of contour
+                        Rect rect = Imgproc.boundingRect(points);
 
-                    if (contourIdx == pontoInicial) {
-                        Imgproc.putText(mRgba, "4", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
-                        pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "4"));
+                        if (contourIdx == pontoInicial) {
+                            Imgproc.putText(mRgba, "4", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+                            pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "4"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 0, 255), 3);
-                    } else if (rect.width > rect.height * 1.5 || rect.height > rect.width * 1.5) {
+                        } else if (rect.width > rect.height * 1.5 || rect.height > rect.width * 1.5) {
 //                        Imgproc.putText(mRgba, "0", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
-                        pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "0"));
+                            pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "0"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 0, 255, 255), 3);
-                    } else if (paisVazados.contains(contourIdx)) {
+                        } else if (paisVazados.contains(contourIdx)) {
 //                        Imgproc.putText(mRgba, "1", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
-                        pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "1"));
+                            pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "1"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 255, 255), 3);
-                    } else if (!paisVazados.contains(contourIdx)) {
+                        } else if (!paisVazados.contains(contourIdx)) {
 //                        Imgproc.putText(mRgba, "2", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
-                        pointsAndValues.add(new PointValue(new Point(rect.x + rect.width/2, rect.y + rect.height/2), "2"));
+                            pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "2"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 0, 0, 255), 3);
+                        }
                     }
                 }
-            }
 
-            if (pointsAndValues.size() > 0) {
-                String text = decodeText(pointsAndValues);
-                String novoTexto = convertFromBase3(text);
-                if (novoTexto.matches("[a-zA-Z0-9]+")) {
-                    textoDecode = novoTexto;
+                if (pointsAndValues.size() > 0) {
+                    String text = decodeText(pointsAndValues);
+                    String novoTexto = convertFromBase3(text);
+                    if (novoTexto.matches("[a-zA-Z0-9]+")) {
+                        textoDecode = novoTexto;
+                    }
                 }
             }
 
