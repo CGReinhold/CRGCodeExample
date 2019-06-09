@@ -27,11 +27,7 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
-
-// OpenCV Classes
 
 public class MainActivity extends AppCompatActivity implements CvCameraViewListener2 {
 
@@ -127,7 +123,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
         int quarter = boundBox.width / 4;
 
-        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
+//        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
         Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
 
         Mat mask = new Mat(mGray.rows(), mGray.cols(), mGray.type(), Scalar.all(0));
@@ -144,8 +140,10 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         ArrayList<MatOfPoint> allContours = new ArrayList<>();
         Mat allHierarchy = new Mat();
 
-        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
+//        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
         Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+
+//        return mGray;
         Imgproc.findContours(mGray, allContours, allHierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
         Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(11, 11)), new Point(-1, -1), 5);
         Imgproc.morphologyEx(mGray, mGray, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25)));
@@ -160,8 +158,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         mClean = Mat.zeros(mGray.size(), 0);
 
         Imgproc.drawContours(mOuterShape, contours, -1, new Scalar(255, 255, 255), -1);
+
+
         Imgproc.drawContours(mInnerShape, contours, -1, new Scalar(255, 255, 255), -1);
-        Imgproc.erode(mInnerShape, mInnerShape, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(17, 17)), new Point(-1, -1), 5);
+        Imgproc.erode(mInnerShape, mInnerShape, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(21, 21)), new Point(-1, -1), 5);
+
+//        Imgproc.drawContours(mInnerShape, allContours, -1, new Scalar(0, 0, 0), -1);
+//        return mInnerShape;
 
         //Drawing the inner contours
         if (allContours.size() > 0) {
