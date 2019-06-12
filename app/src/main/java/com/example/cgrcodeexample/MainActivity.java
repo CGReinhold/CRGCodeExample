@@ -1,6 +1,7 @@
 package com.example.cgrcodeexample;
 
-import android.graphics.Bitmap;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -14,11 +15,9 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
@@ -28,6 +27,8 @@ import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements CvCameraViewListener2 {
 
@@ -170,7 +171,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         if (allContours.size() > 0) {
             ArrayList<MatOfPoint> newAllContours = new ArrayList<>();
             ArrayList<Integer> newAllContoursPoints = new ArrayList<>();
-            ArrayList<Integer> paisVazados = new ArrayList<>();
+            Map<Integer, Integer> paisVazados = new HashMap<>();
             ArrayList<Integer> filhosVazados = new ArrayList<>();
             int pontoInicial = -1;
             int i = 0;
@@ -188,8 +189,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                                 if (filhosVazados.contains(pai)) {
                                     pontoInicial = (int)allHierarchy.get(0, pai)[3];
                                 } else {
-                                    paisVazados.add(pai);
-                                    filhosVazados.add(i);
+                                    if (!paisVazados.containsKey(pai)) {
+                                        paisVazados.put(pai, 1);
+                                        filhosVazados.add(i);
+                                    } else {
+                                        paisVazados.put(pai, paisVazados.get(pai) + 1);
+                                        filhosVazados.add(i);
+                                    }
                                 }
                             } else {
                                 newAllContours.add(contour);
@@ -229,15 +235,19 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                             pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "4"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 0, 255), 3);
                         } else if (rect.width > rect.height * 1.5 || rect.height > rect.width * 1.5) {
-//                        Imgproc.putText(mRgba, "0", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+                            Imgproc.putText(mRgba, "0", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
                             pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "0"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 0, 255, 255), 3);
-                        } else if (paisVazados.contains(contourIdx)) {
-//                        Imgproc.putText(mRgba, "1", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
-                            pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "1"));
+                        } else if (paisVazados.containsKey(contourIdx) && paisVazados.get(contourIdx) > 1) {
+                            Imgproc.putText(mRgba, "3", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+                            pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "3"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 255, 255), 3);
-                        } else if (!paisVazados.contains(contourIdx)) {
-//                        Imgproc.putText(mRgba, "2", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+                        } else if (paisVazados.containsKey(contourIdx)) {
+                          Imgproc.putText(mRgba, "1", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
+                                pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "1"));
+//                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(0, 255, 255, 255), 3);
+                        } else if (!paisVazados.containsKey(contourIdx)) {
+                          Imgproc.putText(mRgba, "2", new Point(rect.x, rect.y), 3, 1, new Scalar(0, 0, 0, 255), 2);
                             pointsAndValues.add(new PointValue(new Point(rect.x + rect.width / 2, rect.y + rect.height / 2), "2"));
 //                        Imgproc.rectangle(mRgba, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 0, 0, 255), 3);
                         }
@@ -246,9 +256,11 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
                 if (pointsAndValues.size() > 0) {
                     String text = decodeText(pointsAndValues);
-                    String novoTexto = convertFromBase3(text);
-                    if (novoTexto.matches("[a-zA-Z0-9]+")) {
-                        textoDecode = novoTexto;
+                    String novoTexto = convertFromBase4(text);
+                    textoDecode = novoTexto;
+                    if (textoDecode.startsWith("http://") || textoDecode.startsWith("https://")) {
+                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(textoDecode));
+                        startActivity(browserIntent);
                     }
                 }
             }
@@ -265,22 +277,24 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return new Point(bound.x + bound.width / 2f, bound.y + bound.height / 2f);
     }
 
-    private String convertFromBase3(String text) {
-        String textoFinal = "";
-        while (text.length() > 0) {
-            if (text.length() > 5) {
-                String texto = text.substring(0, 6);
-                Log.println(Log.INFO, "", "texto: " + texto);
-                text = text.substring(6);
-                if (!texto.contains("4")) {
-                    textoFinal += Character.toString((char) Integer.parseInt(texto, 3));
-                }
-            } else {
-                break;
-            }
-        }
-
-        return removeLeadingChar(textoFinal, '0');
+    private String convertFromBase4(String text) {
+        Decoder decoder = new Decoder();
+        return decoder.decode(text);
+//        String textoFinal = "";
+//        while (text.length() > 0) {
+//            if (text.length() > 5) {
+//                String texto = text.substring(0, 6);
+//                Log.println(Log.INFO, "", "texto: " + texto);
+//                text = text.substring(6);
+//                if (!texto.contains("4")) {
+//                    textoFinal += Character.toString((char) Integer.parseInt(texto, 3));
+//                }
+//            } else {
+//                break;
+//            }
+//        }
+//
+//        return removeLeadingChar(textoFinal, '0');
     }
 
     private static String removeLeadingChar(String s, char c) {
