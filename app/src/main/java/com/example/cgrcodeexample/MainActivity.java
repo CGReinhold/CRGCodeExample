@@ -28,7 +28,9 @@ import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
 
 public class MainActivity extends AppCompatActivity implements CvCameraViewListener2 {
 
@@ -44,7 +46,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     Mat mOuterShape;
     Mat mInnerShape;
     Mat mClean;
+
     String textoDecode = "";
+    int equalCount = 0;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -144,7 +148,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 //        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
         Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
 
-//        return mGray;
         Imgproc.findContours(mGray, allContours, allHierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
         Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(11, 11)), new Point(-1, -1), 5);
         Imgproc.morphologyEx(mGray, mGray, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25)));
@@ -159,13 +162,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         mClean = Mat.zeros(mGray.size(), 0);
 
         Imgproc.drawContours(mOuterShape, contours, -1, new Scalar(255, 255, 255), -1);
-
-
         Imgproc.drawContours(mInnerShape, contours, -1, new Scalar(255, 255, 255), -1);
         Imgproc.erode(mInnerShape, mInnerShape, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(21, 21)), new Point(-1, -1), 5);
 
-//        Imgproc.drawContours(mInnerShape, allContours, -1, new Scalar(0, 0, 0), -1);
-//        return mInnerShape;
 
         //Drawing the inner contours
         if (allContours.size() > 0) {
@@ -254,13 +253,22 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                     }
                 }
 
-                if (pointsAndValues.size() > 0) {
+                if (pointsAndValues.size() > 28) {
                     String text = decodeText(pointsAndValues);
-                    String novoTexto = convertFromBase4(text);
-                    textoDecode = novoTexto;
-                    if (textoDecode.startsWith("http://") || textoDecode.startsWith("https://")) {
-                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(textoDecode));
-                        startActivity(browserIntent);
+                    String decodedText = convertFromBase4(text);
+                    boolean isEqualToTheLast = decodedText.equals(textoDecode);
+                    textoDecode = decodedText;
+                    if (isEqualToTheLast) {
+                        equalCount++;
+                    } else {
+                        equalCount = 0;
+                    }
+
+                    if (equalCount >= 4) {
+                        if (textoDecode.startsWith("http://") || textoDecode.startsWith("https://")) {
+                            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(textoDecode));
+                            startActivity(browserIntent);
+                        }
                     }
                 }
             }
@@ -280,27 +288,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     private String convertFromBase4(String text) {
         Decoder decoder = new Decoder();
         return decoder.decode(text);
-//        String textoFinal = "";
-//        while (text.length() > 0) {
-//            if (text.length() > 5) {
-//                String texto = text.substring(0, 6);
-//                Log.println(Log.INFO, "", "texto: " + texto);
-//                text = text.substring(6);
-//                if (!texto.contains("4")) {
-//                    textoFinal += Character.toString((char) Integer.parseInt(texto, 3));
-//                }
-//            } else {
-//                break;
-//            }
-//        }
-//
-//        return removeLeadingChar(textoFinal, '0');
-    }
-
-    private static String removeLeadingChar(String s, char c) {
-        int i;
-        for(i = 0; i < s.length() && s.charAt(i) == c; ++i);
-        return s.substring(i);
     }
 
     private String decodeText(ArrayList<PointValue> points) {
@@ -356,14 +343,6 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         {
             this.point = point;
             this.value = value;
-        }
-
-        public Point getPoint() {
-            return point;
-        }
-
-        public String getValue() {
-            return value;
         }
 
         @Override
