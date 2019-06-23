@@ -109,8 +109,10 @@ public class Decoder {
                     result = decodeAlphanumeric(encoded);
                     break;
                 case '2':
+                    result = decodeDefault(encoded);
                     break;
                 case '3':
+                    result = decodeDefault(encoded);
                     break;
             }
 
@@ -171,5 +173,50 @@ public class Decoder {
         result = result.replaceAll("^\\.+", "");
 
         return result;
+    }
+
+    public String decodeDefault(String encoded) {
+        String result = "";
+        String current = "";
+
+        while (encoded.length() > 0)
+        {
+            current += encoded.charAt(0);
+            encoded = encoded.substring(1);
+            if (current.length() == 6)
+            {
+//                result += alphanumericTable.get(current);
+                Log.println(Log.INFO, "current", current);
+                String converted = convertFromBase4(current);
+                result += converted;
+                current = "";
+            }
+        }
+
+        result = result.replaceAll("^\\.+", "");
+
+        return result;
+    }
+
+    private String convertFromBase4(String text) {
+        String textoFinal = "";
+        while (text.length() > 0) {
+            if (text.length() > 5) {
+                String texto = text.substring(0, 6);
+                text = text.substring(6);
+                Log.println(Log.INFO, "integer char", Integer.parseInt(texto, 4) + "");
+                textoFinal += Character.toString((char)Integer.parseInt(texto, 4));
+            } else {
+                break;
+            }
+        }
+
+        return removeLeadingChar(textoFinal, '0');
+    }
+
+    private static String removeLeadingChar(String s, char c) {
+        int i;
+        for(i = 0; i < s.length() && s.charAt(i) == c; ++i);
+        return s.substring(i);
     }
 }

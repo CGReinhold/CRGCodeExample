@@ -26,7 +26,9 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -147,6 +149,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
 //        Imgproc.GaussianBlur(mGray, mGray, new Size(5, 5), 0);
         Imgproc.threshold(mGray, mGray, 0, 255, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+
 
         Imgproc.findContours(mGray, allContours, allHierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
         Imgproc.dilate(mGray, mGray, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(11, 11)), new Point(-1, -1), 5);
@@ -269,11 +272,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                             Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(textoDecode));
                             startActivity(browserIntent);
                         }
+
+                        String finalString = Normalizer.normalize(textoDecode, Normalizer.Form.NFD);
+                        finalString = finalString.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
+                        Imgproc.putText(mRgba, finalString, new Point(20, 100), 2, 3, new Scalar(0, 0, 255, 255), 2);
                     }
                 }
             }
-
-            Imgproc.putText(mRgba, textoDecode, new Point(20, 100), 3, 3, new Scalar(0, 0, 255, 255), 2);
         }
 
         return mRgba;
